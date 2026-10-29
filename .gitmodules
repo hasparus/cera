@@ -1,0 +1,3 @@
+[submodule "vendor/ai-app-playbook"]
+	path = vendor/ai-app-playbook
+	url = https://github.com/blakeandersonw/ai-app-playbook
