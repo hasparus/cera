@@ -7,3 +7,4 @@ bun.lock
 tamagui-web.css
 .agents/
 convex/_generated/
+vendor/
