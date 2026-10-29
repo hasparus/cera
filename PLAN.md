@@ -20,6 +20,10 @@ hooks, mise.toml, GitHub Actions CI (closes #9).
 - **Local-first stays.** Convex is backup + shared data + server-side secrets,
   not the source of truth for "did I do my evening routine". App must work offline.
 - **Web hosting: Vercel** (static export), privacy/terms on the same domain.
+- **Stack stays Expo + Convex** (2026-10-29). Evaluated the ai-app-playbook
+  stack (SwiftUI + Cloudflare Workers/D1, see `PLAYBOOK_ANALYSIS.md`) and
+  passed: Cera is local-first with no per-call AI in its core loop, so a
+  rewrite would cost months and save nothing at our scale.
 
 ## Roadmap
 
