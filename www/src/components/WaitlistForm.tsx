@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useReducer } from "react";
 
 export interface WaitlistLabels {
   label: string;
@@ -22,6 +22,26 @@ interface Props {
 
 type Status = "idle" | "sending" | "success" | "error" | "invalid";
 
+type FormState = { status: Status; email: string };
+
+type FormAction =
+  | { type: "edit"; email: string }
+  | { type: "submitted"; status: Exclude<Status, "idle"> };
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case "edit": {
+      const clearError = state.status === "error" || state.status === "invalid";
+      return {
+        email: action.email,
+        status: clearError ? "idle" : state.status,
+      };
+    }
+    case "submitted":
+      return { ...state, status: action.status };
+  }
+}
+
 export default function WaitlistForm({
   labels,
   locale,
@@ -30,15 +50,17 @@ export default function WaitlistForm({
   align = "center",
   tone = "day",
 }: Props) {
-  const [status, setStatus] = useState<Status>("idle");
-  const [email, setEmail] = useState("");
+  const [{ status, email }, dispatch] = useReducer(formReducer, {
+    status: "idle",
+    email: "",
+  });
 
   async function submit() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setStatus("invalid");
+      dispatch({ type: "submitted", status: "invalid" });
       return;
     }
-    setStatus("sending");
+    dispatch({ type: "submitted", status: "sending" });
     try {
       if (!endpoint) throw new Error("waitlist endpoint not configured");
       const res = await fetch(endpoint, {
@@ -47,10 +69,10 @@ export default function WaitlistForm({
         body: JSON.stringify({ email, locale }),
       });
       if (!res.ok) throw new Error(`waitlist signup failed: ${res.status}`);
-      setStatus("success");
+      dispatch({ type: "submitted", status: "success" });
     } catch (err) {
       console.error(err);
-      setStatus("error");
+      dispatch({ type: "submitted", status: "error" });
     }
   }
 
@@ -121,10 +143,7 @@ export default function WaitlistForm({
           required
           placeholder={labels.placeholder}
           value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (showError) setStatus("idle");
-          }}
+          onChange={(e) => dispatch({ type: "edit", email: e.target.value })}
           aria-invalid={status === "invalid" || undefined}
           aria-describedby={showError ? `${inputId}-msg` : undefined}
           disabled={status === "sending"}

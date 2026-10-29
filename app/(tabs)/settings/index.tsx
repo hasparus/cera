@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Platform, Alert, Share } from "react-native";
 import { YStack, XStack, Text, Separator, ScrollView } from "tamagui";
 import { useTheme } from "@/context/theme";
@@ -57,7 +57,6 @@ export default function SettingsScreen() {
   const { products } = useCosmetics();
   const { routineConfig, routineHistory } = useRoutine();
   const queryClient = useQueryClient();
-  const [, setIsExporting] = useState(false);
   const isDeveloper = useIsDeveloper();
 
   const handleOpenURL = async (url: string) => {
@@ -91,7 +90,6 @@ export default function SettingsScreen() {
   };
 
   const handleExportData = async () => {
-    setIsExporting(true);
     try {
       const exportData = {
         exportedAt: new Date().toISOString(),
@@ -119,8 +117,6 @@ export default function SettingsScreen() {
       }
     } catch {
       Alert.alert(t("settings.exportFailed"), t("settings.exportFailedBody"));
-    } finally {
-      setIsExporting(false);
     }
   };
 

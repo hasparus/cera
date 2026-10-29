@@ -5,7 +5,7 @@ import { ThemeProvider, useTheme } from "@/context/theme";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useReducer } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useColorScheme } from "react-native";
@@ -62,7 +62,7 @@ function RootNavigator() {
 }
 
 function AppProviders() {
-  const [errorKey, setErrorKey] = useState(0);
+  const [errorKey, bumpErrorKey] = useReducer((key: number) => key + 1, 0);
   const { t, isLocaleReady } = useIntl();
 
   useEffect(() => {
@@ -72,7 +72,7 @@ function AppProviders() {
   }, [isLocaleReady]);
 
   const handleErrorReset = () => {
-    setErrorKey((prev) => prev + 1);
+    bumpErrorKey();
   };
 
   const errorLabels = useMemo(

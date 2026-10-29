@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useReducer } from "react";
 import { FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { YStack, XStack, Text } from "tamagui";
@@ -31,8 +31,15 @@ export default function ShelfScreen() {
   const router = useRouter();
   const { colors, showDetailedConflicts } = useTheme();
   const { t } = useIntl();
-  const [expandedConflict, setExpandedConflict] = useState<number | null>(null);
-  const [showAllConflicts, setShowAllConflicts] = useState(false);
+  const [expandedConflict, toggleConflict] = useReducer(
+    (expanded: number | null, index: number) =>
+      expanded === index ? null : index,
+    null,
+  );
+  const [showAllConflicts, toggleShowAllConflicts] = useReducer(
+    (show: boolean) => !show,
+    false,
+  );
 
   const conflicts = useMemo(() => detectConflicts(products), [products]);
   const highSeverityCount = useMemo(
@@ -90,9 +97,7 @@ export default function ShelfScreen() {
           padding={14}
           alignItems="center"
           onPress={() =>
-            showDetailedConflicts
-              ? setExpandedConflict(isExpanded ? null : index)
-              : undefined
+            showDetailedConflicts ? toggleConflict(index) : undefined
           }
         >
           <YStack
@@ -321,7 +326,7 @@ export default function ShelfScreen() {
             <YStack
               alignItems="center"
               paddingTop={8}
-              onPress={() => setShowAllConflicts(!showAllConflicts)}
+              onPress={toggleShowAllConflicts}
             >
               <Text fontSize={13} fontWeight="600" color={colors.tint}>
                 {showAllConflicts

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useReducer } from "react";
 import { ScrollView as RNScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { YStack, XStack, Text, ScrollView } from "tamagui";
@@ -19,7 +19,11 @@ import { useIntl } from "@/context/intl";
 import { PageTitleBar } from "@/components/PageTitleBar";
 
 export default function RoutineScreen() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, selectDate] = useReducer(
+    (_: Date, date: Date) => date,
+    undefined,
+    () => new Date(),
+  );
   const { routineConfig, routineHistory, toggleCompletion } = useRoutine();
   const { products } = useCosmetics();
   const { colors } = useTheme();
@@ -208,7 +212,7 @@ export default function RoutineScreen() {
                 marginHorizontal={5}
                 borderRadius={16}
                 backgroundColor={isSelected ? colors.tint : "transparent"}
-                onPress={() => setSelectedDate(date)}
+                onPress={() => selectDate(date)}
               >
                 <Text
                   fontSize={12}

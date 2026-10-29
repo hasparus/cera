@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useReducer } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { YStack, XStack, Text, ScrollView } from "tamagui";
@@ -10,7 +10,6 @@ import {
   eachDayOfInterval,
   isSameDay,
   addMonths,
-  subMonths,
   getDay,
 } from "date-fns";
 import {
@@ -37,8 +36,15 @@ export default function CalendarScreen() {
   const { products } = useCosmetics();
   const insets = useSafeAreaInsets();
 
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [currentMonth, shiftMonth] = useReducer(
+    (month: Date, by: number) => addMonths(month, by),
+    undefined,
+    () => new Date(),
+  );
+  const [selectedDate, selectDate] = useReducer(
+    (_: Date | null, date: Date) => date,
+    null,
+  );
 
   const calendarDays = useMemo(() => {
     const start = startOfMonth(currentMonth);
@@ -116,7 +122,7 @@ export default function CalendarScreen() {
             padding={10}
             borderRadius={12}
             backgroundColor={colors.card}
-            onPress={() => setCurrentMonth((prev) => subMonths(prev, 1))}
+            onPress={() => shiftMonth(-1)}
           >
             <ChevronLeft size={20} color={colors.text} />
           </YStack>
@@ -129,7 +135,7 @@ export default function CalendarScreen() {
             padding={10}
             borderRadius={12}
             backgroundColor={colors.card}
-            onPress={() => setCurrentMonth((prev) => addMonths(prev, 1))}
+            onPress={() => shiftMonth(1)}
           >
             <ChevronRight size={20} color={colors.text} />
           </YStack>
@@ -183,7 +189,7 @@ export default function CalendarScreen() {
                   }
                   borderWidth={isToday && !isSelected ? 1 : 0}
                   borderColor={colors.tint}
-                  onPress={() => setSelectedDate(day)}
+                  onPress={() => selectDate(day)}
                 >
                   <Text
                     fontSize={14}

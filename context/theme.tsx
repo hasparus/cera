@@ -1,6 +1,6 @@
 import createContextHook from "@nkzw/create-context-hook";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useReducer, useMemo, useCallback } from "react";
 import { useColorScheme as useNativeColorScheme } from "react-native";
 import { Colors } from "@/constants/colors";
 
@@ -9,16 +9,56 @@ type AppSettings = {
   showDetailedConflicts: boolean;
 };
 
+type ThemeState = {
+  themeMode: ThemeMode;
+  isLoaded: boolean;
+  appSettings: AppSettings;
+};
+
+type ThemeAction =
+  | {
+      type: "loaded";
+      themeMode: ThemeMode | null;
+      appSettings: Partial<AppSettings> | null;
+    }
+  | { type: "setThemeMode"; themeMode: ThemeMode }
+  | { type: "updateAppSettings"; updates: Partial<AppSettings> };
+
+const initialThemeState: ThemeState = {
+  themeMode: "auto",
+  isLoaded: false,
+  appSettings: { showDetailedConflicts: true },
+};
+
+function themeReducer(state: ThemeState, action: ThemeAction): ThemeState {
+  switch (action.type) {
+    case "loaded":
+      return {
+        themeMode: action.themeMode ?? state.themeMode,
+        isLoaded: true,
+        appSettings: { ...state.appSettings, ...action.appSettings },
+      };
+    case "setThemeMode":
+      return { ...state, themeMode: action.themeMode };
+    case "updateAppSettings":
+      return {
+        ...state,
+        appSettings: { ...state.appSettings, ...action.updates },
+      };
+  }
+}
+
 export const [ThemeProvider, useTheme] = createContextHook(() => {
   const systemColorScheme = useNativeColorScheme();
-  const [themeMode, setThemeMode] = useState<ThemeMode>("auto");
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [appSettings, setAppSettingsState] = useState<AppSettings>({
-    showDetailedConflicts: true,
-  });
+  const [{ themeMode, isLoaded, appSettings }, dispatch] = useReducer(
+    themeReducer,
+    initialThemeState,
+  );
 
   useEffect(() => {
     const load = async () => {
+      let themeMode: ThemeMode | null = null;
+      let appSettings: Partial<AppSettings> | null = null;
       try {
         const [storedTheme, storedSettings] = await Promise.all([
           AsyncStorage.getItem("themeMode"),
@@ -30,12 +70,11 @@ export const [ThemeProvider, useTheme] = createContextHook(() => {
             storedTheme === "dark" ||
             storedTheme === "auto")
         ) {
-          setThemeMode(storedTheme as ThemeMode);
+          themeMode = storedTheme;
         }
         if (storedSettings) {
           try {
-            const parsed = JSON.parse(storedSettings) as Partial<AppSettings>;
-            setAppSettingsState((prev) => ({ ...prev, ...parsed }));
+            appSettings = JSON.parse(storedSettings) as Partial<AppSettings>;
           } catch (e) {
             console.log("[Theme] failed to parse appSettings", e);
           }
@@ -43,24 +82,27 @@ export const [ThemeProvider, useTheme] = createContextHook(() => {
       } catch (e) {
         console.error("[Theme] failed to load stored settings", e);
       } finally {
-        setIsLoaded(true);
+        dispatch({ type: "loaded", themeMode, appSettings });
       }
     };
     void load();
   }, []);
 
   const setTheme = useCallback(async (mode: ThemeMode) => {
-    setThemeMode(mode);
+    dispatch({ type: "setThemeMode", themeMode: mode });
     await AsyncStorage.setItem("themeMode", mode);
   }, []);
 
-  const setAppSettings = useCallback(async (updates: Partial<AppSettings>) => {
-    setAppSettingsState((prev) => {
-      const next = { ...prev, ...updates };
-      void AsyncStorage.setItem("appSettings", JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  const setAppSettings = useCallback(
+    async (updates: Partial<AppSettings>) => {
+      dispatch({ type: "updateAppSettings", updates });
+      await AsyncStorage.setItem(
+        "appSettings",
+        JSON.stringify({ ...appSettings, ...updates }),
+      );
+    },
+    [appSettings],
+  );
 
   const activeColorScheme = useMemo(() => {
     if (themeMode === "auto") {

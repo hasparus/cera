@@ -10,6 +10,10 @@ local linters = new Mapping<String, Step> {
         glob = "**/*.{ts,tsx}"
         check = "bunx eslint {{files}}"
     }
+    ["oxlint"] {
+        glob = "**/*.{js,jsx,ts,tsx}"
+        check = "bunx oxlint --no-error-on-unmatched-pattern {{files}}"
+    }
     ["typecheck"] {
         glob = "**/*.{ts,tsx}"
         check = "bun typecheck"

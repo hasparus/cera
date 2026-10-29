@@ -7,6 +7,7 @@
     "start-web": "bunx expo start --web",
     "start-web-dev": "DEBUG=expo* bunx expo start --web",
     "lint": "expo lint",
+    "oxlint": "oxlint",
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
@@ -64,6 +65,7 @@
     "@types/react": "~19.1.10",
     "eslint": "^9.31.0",
     "eslint-config-expo": "~10.0.0",
+    "oxlint": "1.90.0",
     "prettier": "3.8.5",
     "prettier-plugin-astro": "0.14.1",
     "typescript": "~5.9.2"

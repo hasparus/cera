@@ -1,0 +1,34 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    ".agents/**",
+    ".expo/**",
+    "convex/_generated/**",
+    "dist/**",
+    "vendor/**",
+    "www/dist/**",
+    "www/.astro/**"
+  ],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "react",
+            "importNames": ["useState"],
+            "message": "Use useReducer instead of useState."
+          }
+        ]
+      }
+    ],
+    "no-restricted-properties": [
+      "error",
+      {
+        "object": "React",
+        "property": "useState",
+        "message": "Use useReducer instead of useState."
+      }
+    ]
+  }
+}

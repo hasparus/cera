@@ -1,6 +1,6 @@
 import createContextHook from "@nkzw/create-context-hook";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer } from "react";
 
 export type AppLocale = "en" | "pl" | "ua";
 
@@ -350,28 +350,46 @@ const interpolate = (template: string, params?: TranslationParams) => {
   );
 };
 
+type LocaleState = { locale: AppLocale; isLocaleReady: boolean };
+
+type LocaleAction =
+  | { type: "loaded"; storedLocale: AppLocale | null }
+  | { type: "setLocale"; locale: AppLocale };
+
+function localeReducer(state: LocaleState, action: LocaleAction): LocaleState {
+  switch (action.type) {
+    case "loaded":
+      return {
+        locale: action.storedLocale ?? state.locale,
+        isLocaleReady: true,
+      };
+    case "setLocale":
+      return { ...state, locale: action.locale };
+  }
+}
+
 export const [IntlProvider, useIntl] = createContextHook(() => {
-  const [locale, setLocaleState] = useState<AppLocale>(getSystemLocale);
-  const [isLocaleReady, setIsLocaleReady] = useState(false);
+  const [{ locale, isLocaleReady }, dispatch] = useReducer(
+    localeReducer,
+    undefined,
+    () => ({ locale: getSystemLocale(), isLocaleReady: false }),
+  );
 
   useEffect(() => {
     void (async () => {
+      let storedLocale: AppLocale | null = null;
       try {
-        const storedLocale = await AsyncStorage.getItem(STORAGE_KEY);
-        const normalizedLocale = normalizeLocale(storedLocale);
-        if (normalizedLocale) {
-          setLocaleState(normalizedLocale);
-        }
+        storedLocale = normalizeLocale(await AsyncStorage.getItem(STORAGE_KEY));
       } catch (err) {
         console.error("Failed to read locale from AsyncStorage", err);
       } finally {
-        setIsLocaleReady(true);
+        dispatch({ type: "loaded", storedLocale });
       }
     })();
   }, []);
 
   const setLocale = useCallback(async (nextLocale: AppLocale) => {
-    setLocaleState(nextLocale);
+    dispatch({ type: "setLocale", locale: nextLocale });
     try {
       await AsyncStorage.setItem(STORAGE_KEY, nextLocale);
     } catch (err) {

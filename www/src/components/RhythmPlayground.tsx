@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import {
   AnimatePresence,
   motion,
@@ -44,9 +44,11 @@ const ROWS = [
   },
 ];
 
+const pickDay = (_: number | null, day: number | null) => day;
+
 export default function RhythmPlayground({ labels }: Props) {
-  const [hotCol, setHotCol] = useState<number | null>(null);
-  const [openDay, setOpenDay] = useState<number | null>(null);
+  const [hotCol, setHotCol] = useReducer(pickDay, null);
+  const [openDay, setOpenDay] = useReducer(pickDay, null);
   const gridRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef(0);

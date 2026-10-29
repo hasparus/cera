@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useReducer } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -29,7 +29,6 @@ import {
   eachDayOfInterval,
   getDay,
   addMonths,
-  subMonths,
   isSameDay,
   isAfter,
 } from "date-fns";
@@ -49,6 +48,162 @@ const MOCK_SUGGESTIONS = [
 
 const WEEKDAY_INDEXES = [0, 1, 2, 3, 4, 5, 6];
 
+type Suggestion = (typeof MOCK_SUGGESTIONS)[number];
+type FreqType = "daily" | "interval" | "weekly";
+
+type FormState = {
+  brand: string;
+  name: string;
+  pao: string;
+  openedAt: Date;
+  showDatePicker: boolean;
+  calendarViewMonth: Date;
+  noEndDate: boolean;
+  endDate: Date | null;
+  showEndDatePicker: boolean;
+  endCalendarViewMonth: Date;
+  selectedRoutine: TimeOfDay[];
+  imageUri: string | null;
+  freqType: FreqType;
+  intervalDays: string;
+  selectedWeekDays: number[];
+  suggestions: Suggestion[];
+};
+
+type FormAction =
+  | { type: "setBrand"; brand: string }
+  | { type: "setName"; name: string }
+  | { type: "selectSuggestion"; suggestion: Suggestion }
+  | { type: "setPao"; pao: string }
+  | { type: "openDatePicker" }
+  | { type: "closeDatePicker" }
+  | { type: "shiftCalendarMonth"; by: number }
+  | { type: "setOpenedAt"; date: Date }
+  | { type: "resetOpenedAt"; today: Date }
+  | { type: "openEndDatePicker"; today: Date }
+  | { type: "closeEndDatePicker" }
+  | { type: "shiftEndCalendarMonth"; by: number }
+  | { type: "setEndDate"; date: Date }
+  | { type: "toggleNoEndDate" }
+  | { type: "toggleRoutine"; time: TimeOfDay }
+  | { type: "setImage"; uri: string }
+  | { type: "setFreqType"; freqType: FreqType }
+  | { type: "setIntervalDays"; days: string }
+  | { type: "toggleWeekDay"; dayIndex: number };
+
+const createInitialForm = (): FormState => ({
+  brand: "",
+  name: "",
+  pao: "12",
+  openedAt: new Date(),
+  showDatePicker: false,
+  calendarViewMonth: new Date(),
+  noEndDate: true,
+  endDate: null,
+  showEndDatePicker: false,
+  endCalendarViewMonth: new Date(),
+  selectedRoutine: [],
+  imageUri: null,
+  freqType: "daily",
+  intervalDays: "2",
+  selectedWeekDays: [],
+  suggestions: [],
+});
+
+const toggleItem = <T,>(items: T[], item: T) =>
+  items.includes(item) ? items.filter((i) => i !== item) : [...items, item];
+
+const findSuggestions = (text: string) => {
+  if (text.length <= 1) return [];
+  const query = text.toLowerCase();
+  return MOCK_SUGGESTIONS.filter(
+    (s) =>
+      s.name.toLowerCase().includes(query) ||
+      s.brand.toLowerCase().includes(query),
+  ).slice(0, 3);
+};
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case "setBrand":
+      return { ...state, brand: action.brand };
+    case "setName":
+      return {
+        ...state,
+        name: action.name,
+        suggestions: findSuggestions(action.name),
+      };
+    case "selectSuggestion":
+      return {
+        ...state,
+        brand: action.suggestion.brand,
+        name: action.suggestion.name,
+        suggestions: [],
+      };
+    case "setPao":
+      return { ...state, pao: action.pao };
+    case "openDatePicker":
+      return {
+        ...state,
+        calendarViewMonth: state.openedAt,
+        showDatePicker: true,
+      };
+    case "closeDatePicker":
+      return { ...state, showDatePicker: false };
+    case "shiftCalendarMonth":
+      return {
+        ...state,
+        calendarViewMonth: addMonths(state.calendarViewMonth, action.by),
+      };
+    case "setOpenedAt":
+      return { ...state, openedAt: action.date };
+    case "resetOpenedAt":
+      return {
+        ...state,
+        openedAt: action.today,
+        calendarViewMonth: action.today,
+      };
+    case "openEndDatePicker":
+      if (state.noEndDate) return state;
+      return {
+        ...state,
+        endCalendarViewMonth: state.endDate ?? action.today,
+        showEndDatePicker: true,
+      };
+    case "closeEndDatePicker":
+      return { ...state, showEndDatePicker: false };
+    case "shiftEndCalendarMonth":
+      return {
+        ...state,
+        endCalendarViewMonth: addMonths(state.endCalendarViewMonth, action.by),
+      };
+    case "setEndDate":
+      return { ...state, endDate: action.date };
+    case "toggleNoEndDate":
+      return {
+        ...state,
+        noEndDate: !state.noEndDate,
+        endDate: state.noEndDate ? null : state.endDate,
+      };
+    case "toggleRoutine":
+      return {
+        ...state,
+        selectedRoutine: toggleItem(state.selectedRoutine, action.time),
+      };
+    case "setImage":
+      return { ...state, imageUri: action.uri };
+    case "setFreqType":
+      return { ...state, freqType: action.freqType };
+    case "setIntervalDays":
+      return { ...state, intervalDays: action.days };
+    case "toggleWeekDay":
+      return {
+        ...state,
+        selectedWeekDays: toggleItem(state.selectedWeekDays, action.dayIndex),
+      };
+  }
+}
+
 export default function AddProductScreen() {
   const router = useRouter();
   const { addProduct } = useCosmetics();
@@ -56,26 +211,29 @@ export default function AddProductScreen() {
   const { colors } = useTheme();
   const { t, formatDate } = useIntl();
 
-  const [brand, setBrand] = useState("");
-  const [name, setName] = useState("");
-  const [pao, setPao] = useState("12");
-  const [openedAt, setOpenedAt] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [calendarViewMonth, setCalendarViewMonth] = useState(new Date());
-  const [noEndDate, setNoEndDate] = useState(true);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [endCalendarViewMonth, setEndCalendarViewMonth] = useState(new Date());
-  const [selectedRoutine, setSelectedRoutine] = useState<TimeOfDay[]>([]);
-  const [imageUri, setImageUri] = useState<string | null>(null);
-
-  const [freqType, setFreqType] = useState<"daily" | "interval" | "weekly">(
-    "daily",
+  const [form, dispatch] = useReducer(
+    formReducer,
+    undefined,
+    createInitialForm,
   );
-  const [intervalDays, setIntervalDays] = useState("2");
-  const [selectedWeekDays, setSelectedWeekDays] = useState<number[]>([]);
-
-  const [suggestions, setSuggestions] = useState<typeof MOCK_SUGGESTIONS>([]);
+  const {
+    brand,
+    name,
+    pao,
+    openedAt,
+    showDatePicker,
+    calendarViewMonth,
+    noEndDate,
+    endDate,
+    showEndDatePicker,
+    endCalendarViewMonth,
+    selectedRoutine,
+    imageUri,
+    freqType,
+    intervalDays,
+    selectedWeekDays,
+    suggestions,
+  } = form;
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(calendarViewMonth);
@@ -93,34 +251,6 @@ export default function AddProductScreen() {
     return { days, startPadding };
   }, [endCalendarViewMonth]);
 
-  const handleNameChange = (text: string) => {
-    setName(text);
-    if (text.length > 1) {
-      const filtered = MOCK_SUGGESTIONS.filter(
-        (s) =>
-          s.name.toLowerCase().includes(text.toLowerCase()) ||
-          s.brand.toLowerCase().includes(text.toLowerCase()),
-      );
-      setSuggestions(filtered.slice(0, 3));
-    } else {
-      setSuggestions([]);
-    }
-  };
-
-  const selectSuggestion = (item: (typeof MOCK_SUGGESTIONS)[0]) => {
-    setBrand(item.brand);
-    setName(item.name);
-    setSuggestions([]);
-  };
-
-  const toggleRoutine = (time: TimeOfDay) => {
-    if (selectedRoutine.includes(time)) {
-      setSelectedRoutine((prev) => prev.filter((t) => t !== time));
-    } else {
-      setSelectedRoutine((prev) => [...prev, time]);
-    }
-  };
-
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -130,15 +260,7 @@ export default function AddProductScreen() {
     });
 
     if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
-    }
-  };
-
-  const toggleWeekDay = (dayIndex: number) => {
-    if (selectedWeekDays.includes(dayIndex)) {
-      setSelectedWeekDays((prev) => prev.filter((d) => d !== dayIndex));
-    } else {
-      setSelectedWeekDays((prev) => [...prev, dayIndex]);
+      dispatch({ type: "setImage", uri: result.assets[0].uri });
     }
   };
 
@@ -370,7 +492,7 @@ export default function AddProductScreen() {
               color={colors.text}
               placeholder={t("add.productNamePlaceholder")}
               value={name}
-              onChangeText={handleNameChange}
+              onChangeText={(text) => dispatch({ type: "setName", name: text })}
               placeholderTextColor={colors.subtext}
             />
             {suggestions.length > 0 && (
@@ -397,7 +519,9 @@ export default function AddProductScreen() {
                     paddingHorizontal={12}
                     borderBottomWidth={1}
                     borderBottomColor={colors.border}
-                    onPress={() => selectSuggestion(item)}
+                    onPress={() =>
+                      dispatch({ type: "selectSuggestion", suggestion: item })
+                    }
                   >
                     <Text fontSize={14} color={colors.text}>
                       <Text fontWeight="600">{item.brand}</Text> {item.name}
@@ -427,7 +551,9 @@ export default function AddProductScreen() {
               color={colors.text}
               placeholder={t("add.brandPlaceholder")}
               value={brand}
-              onChangeText={setBrand}
+              onChangeText={(text) =>
+                dispatch({ type: "setBrand", brand: text })
+              }
               placeholderTextColor={colors.subtext}
             />
           </YStack>
@@ -447,10 +573,7 @@ export default function AddProductScreen() {
                 padding={16}
                 alignItems="center"
                 backgroundColor={colors.card}
-                onPress={() => {
-                  setCalendarViewMonth(openedAt);
-                  setShowDatePicker(true);
-                }}
+                onPress={() => dispatch({ type: "openDatePicker" })}
               >
                 <Text fontSize={15} fontWeight="500" color={colors.text}>
                   {formatDate(openedAt, "productDate")}
@@ -488,7 +611,9 @@ export default function AddProductScreen() {
                   color={colors.text}
                   placeholder="12"
                   value={pao}
-                  onChangeText={setPao}
+                  onChangeText={(text) =>
+                    dispatch({ type: "setPao", pao: text })
+                  }
                   keyboardType="numeric"
                   placeholderTextColor={colors.subtext}
                 />
@@ -514,12 +639,9 @@ export default function AddProductScreen() {
                 justifyContent="space-between"
                 backgroundColor={colors.card}
                 opacity={noEndDate ? 0.5 : 1}
-                onPress={() => {
-                  if (!noEndDate) {
-                    setEndCalendarViewMonth(endDate || new Date());
-                    setShowEndDatePicker(true);
-                  }
-                }}
+                onPress={() =>
+                  dispatch({ type: "openEndDatePicker", today: new Date() })
+                }
               >
                 <Text
                   fontSize={15}
@@ -539,12 +661,7 @@ export default function AddProductScreen() {
                 alignItems="center"
                 gap={8}
                 backgroundColor={noEndDate ? colors.tint : colors.card}
-                onPress={() => {
-                  setNoEndDate(!noEndDate);
-                  if (noEndDate) {
-                    setEndDate(null);
-                  }
-                }}
+                onPress={() => dispatch({ type: "toggleNoEndDate" })}
               >
                 <InfinityIcon
                   size={18}
@@ -580,7 +697,9 @@ export default function AddProductScreen() {
                 backgroundColor={
                   freqType === "daily" ? colors.card : "transparent"
                 }
-                onPress={() => setFreqType("daily")}
+                onPress={() =>
+                  dispatch({ type: "setFreqType", freqType: "daily" })
+                }
               >
                 <Text
                   fontSize={13}
@@ -598,7 +717,9 @@ export default function AddProductScreen() {
                 backgroundColor={
                   freqType === "weekly" ? colors.card : "transparent"
                 }
-                onPress={() => setFreqType("weekly")}
+                onPress={() =>
+                  dispatch({ type: "setFreqType", freqType: "weekly" })
+                }
               >
                 <Text
                   fontSize={13}
@@ -616,7 +737,9 @@ export default function AddProductScreen() {
                 backgroundColor={
                   freqType === "interval" ? colors.card : "transparent"
                 }
-                onPress={() => setFreqType("interval")}
+                onPress={() =>
+                  dispatch({ type: "setFreqType", freqType: "interval" })
+                }
               >
                 <Text
                   fontSize={13}
@@ -649,7 +772,9 @@ export default function AddProductScreen() {
                   color={colors.tint}
                   borderWidth={0}
                   value={intervalDays}
-                  onChangeText={setIntervalDays}
+                  onChangeText={(text) =>
+                    dispatch({ type: "setIntervalDays", days: text })
+                  }
                   keyboardType="numeric"
                 />
                 <Text fontSize={16} color={colors.text}>
@@ -675,7 +800,9 @@ export default function AddProductScreen() {
                         ? colors.tint
                         : colors.card
                     }
-                    onPress={() => toggleWeekDay(dayIndex)}
+                    onPress={() =>
+                      dispatch({ type: "toggleWeekDay", dayIndex })
+                    }
                   >
                     <Text
                       fontSize={12}
@@ -715,7 +842,9 @@ export default function AddProductScreen() {
                     ? colors.tint
                     : colors.card
                 }
-                onPress={() => toggleRoutine("morning")}
+                onPress={() =>
+                  dispatch({ type: "toggleRoutine", time: "morning" })
+                }
               >
                 <Text
                   fontSize={15}
@@ -744,7 +873,9 @@ export default function AddProductScreen() {
                     ? colors.tint
                     : colors.card
                 }
-                onPress={() => toggleRoutine("evening")}
+                onPress={() =>
+                  dispatch({ type: "toggleRoutine", time: "evening" })
+                }
               >
                 <Text
                   fontSize={15}
@@ -800,7 +931,7 @@ export default function AddProductScreen() {
                     paddingVertical={8}
                     borderRadius={20}
                     backgroundColor={colors.tint}
-                    onPress={() => setShowDatePicker(false)}
+                    onPress={() => dispatch({ type: "closeDatePicker" })}
                   >
                     <Text fontSize={14} fontWeight="600" color="#FFFFFF">
                       {t("common.done")}
@@ -818,7 +949,7 @@ export default function AddProductScreen() {
                     borderRadius={12}
                     backgroundColor={colors.card}
                     onPress={() =>
-                      setCalendarViewMonth(subMonths(calendarViewMonth, 1))
+                      dispatch({ type: "shiftCalendarMonth", by: -1 })
                     }
                   >
                     <ChevronLeft size={20} color={colors.text} />
@@ -831,7 +962,7 @@ export default function AddProductScreen() {
                     borderRadius={12}
                     backgroundColor={colors.card}
                     onPress={() =>
-                      setCalendarViewMonth(addMonths(calendarViewMonth, 1))
+                      dispatch({ type: "shiftCalendarMonth", by: 1 })
                     }
                   >
                     <ChevronRight size={20} color={colors.text} />
@@ -842,7 +973,7 @@ export default function AddProductScreen() {
                   calendarDays.days,
                   calendarDays.startPadding,
                   openedAt,
-                  (day) => setOpenedAt(day),
+                  (day) => dispatch({ type: "setOpenedAt", date: day }),
                 )}
 
                 <XStack justifyContent="center" marginTop={12}>
@@ -851,10 +982,9 @@ export default function AddProductScreen() {
                     paddingVertical={10}
                     borderRadius={16}
                     backgroundColor={colors.card}
-                    onPress={() => {
-                      setOpenedAt(new Date());
-                      setCalendarViewMonth(new Date());
-                    }}
+                    onPress={() =>
+                      dispatch({ type: "resetOpenedAt", today: new Date() })
+                    }
                   >
                     <Text fontSize={13} fontWeight="600" color={colors.tint}>
                       {t("common.today")}
@@ -901,7 +1031,7 @@ export default function AddProductScreen() {
                     paddingVertical={8}
                     borderRadius={20}
                     backgroundColor={colors.tint}
-                    onPress={() => setShowEndDatePicker(false)}
+                    onPress={() => dispatch({ type: "closeEndDatePicker" })}
                   >
                     <Text fontSize={14} fontWeight="600" color="#FFFFFF">
                       {t("common.done")}
@@ -919,9 +1049,7 @@ export default function AddProductScreen() {
                     borderRadius={12}
                     backgroundColor={colors.card}
                     onPress={() =>
-                      setEndCalendarViewMonth(
-                        subMonths(endCalendarViewMonth, 1),
-                      )
+                      dispatch({ type: "shiftEndCalendarMonth", by: -1 })
                     }
                   >
                     <ChevronLeft size={20} color={colors.text} />
@@ -934,9 +1062,7 @@ export default function AddProductScreen() {
                     borderRadius={12}
                     backgroundColor={colors.card}
                     onPress={() =>
-                      setEndCalendarViewMonth(
-                        addMonths(endCalendarViewMonth, 1),
-                      )
+                      dispatch({ type: "shiftEndCalendarMonth", by: 1 })
                     }
                   >
                     <ChevronRight size={20} color={colors.text} />
@@ -947,7 +1073,7 @@ export default function AddProductScreen() {
                   endCalendarDays.days,
                   endCalendarDays.startPadding,
                   endDate || new Date(),
-                  (day) => setEndDate(day),
+                  (day) => dispatch({ type: "setEndDate", date: day }),
                   openedAt,
                 )}
               </YStack>
